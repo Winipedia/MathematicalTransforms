@@ -1,0 +1,9 @@
+# Ignore PyCharm specific files
+.idea/
+
+# Ignore Python compiled files
+*.pyc
+__pycache__/
+
+# Ignore system-specific files (optional, but useful)
+.DS_Store
