@@ -2,21 +2,21 @@ from typing import List, Tuple, Union
 
 import sympy as sp
 from mpmath import mpc
-from sympy.abc import s, t
+from sympy import abc
 
 from transforms.base_transform.base_transform import Transform
 from utils.consts import ZERO
-from utils.mpc import apply_to_mpc_to_leaves, generate_standard_values_for_axis, generate_deltas_for_summation, to_mpc, \
+from utils.mpc import generate_standard_values_for_axis, generate_deltas_for_summation, to_mpc, \
     subs_zero
 
 
 class LaplaceTransform(Transform):
 
-    def _compute_transform_function(self) -> Union[Tuple, sp.Basic]:
+    def _compute_transform_function(self, s=abc.s, t=abc.t) -> Union[Tuple, sp.Basic]:
         transform = sp.laplace_transform(self.base_function, s=s, t=t)
         return transform
 
-    def _compute_inverse_transform_function(self) -> Union[Tuple, sp.Basic]:
+    def _compute_inverse_transform_function(self, s=abc.s, t=abc.t) -> Union[Tuple, sp.Basic]:
         inverse_transform = sp.inverse_laplace_transform(self.transformed_function, s=s, t=t)
         return inverse_transform
 
@@ -37,9 +37,6 @@ class LaplaceTransform(Transform):
         if t_values is None:
             t_values = generate_standard_values_for_axis(f_values)
 
-        # convert all numbers to mpc representation to make calculations easier
-        f_values, t_values = map(apply_to_mpc_to_leaves, (f_values, t_values))
-
         # calculate delta ts
         delta_ts = generate_deltas_for_summation(t_values)
 
@@ -55,7 +52,7 @@ class LaplaceTransform(Transform):
                 # so that 0 terms in f_i won't get lost bc they'd automatically simplify
                 # and could not be backtracked when inverting
                 f_i = ZERO
-            term = f_i * sp.exp(-s * t_i) * delta_t
+            term = f_i * sp.exp(-abc.s * t_i) * delta_t
             laplace_sum_expr += term
 
         return laplace_sum_expr
@@ -86,7 +83,7 @@ class LaplaceTransform(Transform):
                 exponent = exp_term.args[0]  # Exponent should be -s * t_i
 
                 # Solve for t_i
-                t_i_expr = -exponent / s
+                t_i_expr = -exponent / abc.s
                 t_i = t_i_expr.evalf()
 
                 # Extract the coefficient (f_i * delta_t)

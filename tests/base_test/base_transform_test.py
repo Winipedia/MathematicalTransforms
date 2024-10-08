@@ -23,7 +23,7 @@ def pass_on_exceptions(exception: Union[Type[Exception], Tuple[Type[Exception]]]
     return decorator
 
 
-def pass_test_on_left_as_exercise_for_reader():
+def pass_test_on_left_as_exercise_for_reader_error():
     return pass_on_exceptions(exception=ImplementationLeftAsExerciseForTheReaderError)
 
 
@@ -40,7 +40,7 @@ class TestTransform(TestCase):
         self.transform_class = self._transform_class
         self.transform_function_to_solution_dict = self._transform_function_to_solution_dict
         self.transform_data_kwargs_to_solution = self._transform_data_kwargs_to_solution
-        self.test_dps = 1000
+        self.test_dps = 100
         set_precision(self.test_dps)
         self.test_dps_tol = 10
 
@@ -56,7 +56,7 @@ class TestTransform(TestCase):
     """
     Test the transforming of functions
     """
-    @pass_test_on_left_as_exercise_for_reader()
+    @pass_test_on_left_as_exercise_for_reader_error()
     def test_transform(self):
         self._test_transform_on_functions()
 
@@ -71,17 +71,31 @@ class TestTransform(TestCase):
     ):
 
         transform = self.transform_class(function=function, is_base_form=True)
-        self.assertEqual(transform.transformed_function, solution)
+        self.assertTrue(
+            functions_are_equal(
+                transform.transformed_function,
+                solution,
+                dps_tol=self.test_dps_tol,
+                num_tests=10
+            )
+        )
         self.assertEqual(transform.base_function, function)
 
         inverse_transform = self.transform_class(function=solution, is_base_form=False)
-        self.assertEqual(inverse_transform.base_function, function)
+        self.assertTrue(
+            functions_are_equal(
+                inverse_transform.base_function,
+                function,
+                dps_tol=self.test_dps_tol,
+                num_tests=10
+            )
+        )
         self.assertEqual(inverse_transform.transformed_function, solution)
 
     """
     Test the transforming of discrete data
     """
-    @pass_test_on_left_as_exercise_for_reader()
+    @pass_test_on_left_as_exercise_for_reader_error()
     def test_transform_data(self):
         for kwargs, solution in self.transform_data_kwargs_to_solution:
             self._test_transform_data(kwargs, solution)

@@ -15,7 +15,7 @@ class TestWaveletTransform(TestTransform):
     _transform_data_kwargs_to_solution = (
         (
             {
-                "smth": [1, 2, 3],
+                "smth1": [1, 2, 3],
                 "smth2": [1, 2, 3],
             },
             1

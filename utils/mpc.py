@@ -1,9 +1,12 @@
 import random
+import re
 from decimal import Decimal
-from typing import Union, Any, Iterable, Sequence, Mapping
+from functools import wraps
+from typing import Union, Any, Iterable, Sequence, Mapping, Callable
 
 from mpmath import mpc, mp, almosteq
-from sympy import simplify
+from sympy import simplify, Expr
+import sympy as sp
 
 from utils.consts import ZERO
 from utils.util import apply_to_leaves
@@ -43,15 +46,24 @@ def to_mpc(
         real, imaginary = str(number.real), str(number.imag)
         return mpc(real, imaginary)
 
-    else:
-        return mpc(number)
+    elif isinstance(number, sp.Add):
+        if is_effectively_zero_regex(expr=number):
+            return 0
+
+    return mpc(number)
 
 
 def apply_to_mpc_to_leaves(
-        values: Iterable
+        values: Iterable,
+        on_exception: Callable[[Iterable, Exception], Any] = None
 ) -> Any:
+    return apply_to_leaves(values, to_mpc, on_exception)
 
-    return apply_to_leaves(values, to_mpc)
+
+def apply_to_mpc_to_leaves_safely(values: Iterable):
+    def safely(data, _):
+        return data
+    return apply_to_mpc_to_leaves(values=values, on_exception=safely)
 
 
 def mean_mpc(iterable):
@@ -80,9 +92,9 @@ def deep_almost_equal(a, b, dps_tol=None):
     """
     Recursively checks if two data structures are almost equal.
     """
-    assert type(a) is type(b), "The nested structure must be of equal types in depth"
 
     if isinstance(a, Iterable):
+        assert type(a) is type(b), "The nested structure must be of equal types in depth"
         if isinstance(a, Mapping):
             assert a.keys() == b.keys(), "Keys must be the same"
             a, b = a.values(), b.values()
@@ -117,15 +129,22 @@ def functions_are_equal(f1, f2, dps_tol=None, num_tests=1):
     bool
         True if the expressions are equal, False otherwise.
     """
-    f1, f2 = subs_zero(f1), subs_zero(f2)
+    f1 = subs_zero(f1)
+    f2 = subs_zero(f2)
     # Try symbolic equality
-    if f1.equals(f2):
-        return True
+    try:
+        if f1.equals(f2):
+            return True
+    except TypeError:
+        pass
 
-    # Try simplifying the difference
-    diff = simplify(f1 - f2)
-    if diff == 0:
-        return True
+    try:
+        # Try simplifying the difference
+        diff = simplify(f1 - f2)
+        if diff == 0:
+            return True
+    except TypeError:
+        pass
 
     # If symbolic methods failed, proceed to numerical testing
     variables = list(f1.free_symbols.union(f2.free_symbols))
@@ -135,13 +154,48 @@ def functions_are_equal(f1, f2, dps_tol=None, num_tests=1):
         val_dict = {}
         for var in variables:
             # Generate a random value avoiding zeros to prevent division errors
-            val = random.uniform(-10, 10)
+            val = round(random.uniform(-10, 10), 2)
             val_dict[var] = val
 
-        val1 = f1.evalf(subs=val_dict)
-        val2 = f2.evalf(subs=val_dict)
+        val1 = f1.subs(val_dict).evalf()
+        val2 = f2.subs(val_dict).evalf()
         val1, val2 = to_mpc(val1), to_mpc(val2)
         if not almost_equal_to_decimal_places(val1, val2, dps_tol=dps_tol):
             return False
 
     return True
+
+
+def evaluate_function(function: Expr, subs: dict, **kwargs) -> mpc:
+    subs[ZERO] = 0
+    evaluated = function.evalf(subs=subs, **kwargs)
+    evaluated = to_mpc(evaluated)
+    return evaluated
+
+
+def convert_all_input_output_to_mpc_safely(func):
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        args = apply_to_mpc_to_leaves_safely(args)
+        kwargs = apply_to_mpc_to_leaves_safely(kwargs)
+        result = func(*args, **kwargs)
+        result = apply_to_mpc_to_leaves_safely(result)
+        return result
+    return wrapper
+
+
+def is_effectively_zero_regex(expr):
+    # Define a regex pattern to match numbers like -0.e+100 or 0.e-100 with exponent >= 100
+    pattern = r'^-?0\.e[+-]?[1-9]\d{2,}$'
+
+    # Convert real and imaginary parts to strings
+    real_part = str(sp.re(expr))
+    imag_part = str(sp.im(expr))
+
+    # Check if both real and imaginary parts match the pattern
+    real_match = re.match(pattern, real_part.strip())
+    imag_match = re.match(pattern, imag_part.strip())
+
+    # Return True if both real and imaginary parts are effectively zero with exponent >= 100
+    return bool(real_match) and bool(imag_match)

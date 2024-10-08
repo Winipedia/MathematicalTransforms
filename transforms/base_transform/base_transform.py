@@ -5,6 +5,8 @@ from typing import Tuple, Union, List
 import sympy as sp
 from mpmath import mpc
 
+from utils.mpc import convert_all_input_output_to_mpc_safely, TYPE_ANY_NUMBER
+
 
 class Transform:
 
@@ -20,7 +22,12 @@ class Transform:
 
     """
 
-    def __init__(self, function: sp.Basic, is_base_form: bool = True):
+    def __init__(
+            self, function: sp.Basic,
+            is_base_form: bool = True,
+            *args,
+            **kwargs
+    ):
 
         if type(self) is Transform:
             raise TypeError(
@@ -36,10 +43,17 @@ class Transform:
         # first to be able to be used in the transform or inverse transform
         if is_base_form:
             self.base_function = function
-            self.transformed_function = self._transform_function()
+            self.transformed_function = self._transform_function(*args, **kwargs)
         else:
             self.transformed_function = function
-            self.base_function = self._inverse_transform_function()
+            self.base_function = self._inverse_transform_function(*args, **kwargs)
+
+    def __getattribute__(self, item):
+        attr = super().__getattribute__(item)
+        if callable(attr):
+            return convert_all_input_output_to_mpc_safely(attr)
+        else:
+            return attr
 
     @staticmethod
     def _validate_input(function: sp.Basic):
@@ -47,37 +61,39 @@ class Transform:
             raise ValueError("function must be a sympy expression.")
 
     @staticmethod
-    def _extract_function(function: sp.Basic or tuple) -> sp.Basic:
+    def _extract_function(function: sp.Basic or tuple) -> sp.Basic or TYPE_ANY_NUMBER:
         if isinstance(function, tuple):
             transform, convergence_domain, condition = function
             return transform
         elif isinstance(function, sp.Basic):
             return function
+        elif isinstance(function, (int, float, complex, mpc)):
+            return sp.sympify(function)
         else:
             raise ValueError("function must be a sympy expression or a tuple of (transform, convergence_domain, condition).")
 
     """
     Transformations applied to a symbolic mathematical function
     """
-    def _transform_function(self) -> sp.Basic:
+    def _transform_function(self, *args, **kwargs) -> sp.Basic:
         if not hasattr(self, "base_function"):
             raise AttributeError("base_function must be an attribute of the class before applying transform")
-        transform = self._compute_transform_function()
+        transform = self._compute_transform_function(*args, **kwargs)
         return self._extract_function(transform)
 
-    def _compute_transform_function(self) -> Union[Tuple, sp.Basic]:
+    def _compute_transform_function(self, *args, **kwargs) -> Union[Tuple, sp.Basic]:
         raise NotImplementedError
 
     """
     Inverse Transformations applied to a symbolic mathematical function
     """
-    def _inverse_transform_function(self) -> sp.Basic:
+    def _inverse_transform_function(self, *args, **kwargs) -> sp.Basic:
         if not hasattr(self, "transformed_function"):
             raise AttributeError("transformed_function must be an attribute of the class before applying inverse transform")
-        inverse_transform = self._compute_inverse_transform_function()
+        inverse_transform = self._compute_inverse_transform_function(*args, **kwargs)
         return self._extract_function(inverse_transform)
 
-    def _compute_inverse_transform_function(self) -> Union[Tuple, sp.Basic]:
+    def _compute_inverse_transform_function(self, *args, **kwargs) -> Union[Tuple, sp.Basic]:
         raise NotImplementedError
 
     """
