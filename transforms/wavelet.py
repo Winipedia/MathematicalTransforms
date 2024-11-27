@@ -4,10 +4,10 @@ import sympy as sp
 from mpmath import mpc
 
 from exceptions import raise_left_as_exercise_for_reader
-from transforms.base_transform.base_transform import Transform
+from transforms.base_transform.base_transform import BaseTransform
 
 
-class WaveletTransform(Transform):
+class WaveletTransform(BaseTransform):
 
     @raise_left_as_exercise_for_reader
     def _compute_transform_function(self) -> Union[Tuple, sp.Basic]:

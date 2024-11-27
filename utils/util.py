@@ -37,7 +37,3 @@ def apply_to_leaves(
                 return on_exception(data, e)
             else:
                 raise
-
-
-def is_strictly_ascending(iterable: Iterable):
-    return all(x < y for x, y in zip(iterable, iterable[1:]))

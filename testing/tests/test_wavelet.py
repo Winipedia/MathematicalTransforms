@@ -1,10 +1,10 @@
 from sympy import Expr
 
-from tests.base_test.base_transform_test import TestTransform
+from testing.base_tests.base_transform_test import BaseTestTransform
 from transforms.wavelet import WaveletTransform
 
 
-class TestWaveletTransform(TestTransform):
+class TestWaveletTransform(BaseTestTransform):
 
     _transform_class = WaveletTransform
 

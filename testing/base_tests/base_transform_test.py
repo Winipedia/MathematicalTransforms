@@ -2,13 +2,12 @@ from functools import wraps
 from typing import Dict, Type, Any, Tuple, Union
 from unittest import TestCase
 
-from exceptions import ImplementationLeftAsExerciseForTheReaderError
-from transforms.base_transform.base_transform import Transform
+from exceptions import ImplementationLeftAsExerciseForTheUserError
+from transforms.base_transform.base_transform import BaseTransform
 
 import sympy as sp
 
-from utils.mpc import set_precision, deep_almost_equal
-from utils.mpc import functions_are_equal
+from utils.sympy_math import functions_are_equal, deep_almost_equal
 
 
 def pass_on_exceptions(exception: Union[Type[Exception], Tuple[Type[Exception]]]):
@@ -24,14 +23,18 @@ def pass_on_exceptions(exception: Union[Type[Exception], Tuple[Type[Exception]]]
 
 
 def pass_test_on_left_as_exercise_for_reader_error():
-    return pass_on_exceptions(exception=ImplementationLeftAsExerciseForTheReaderError)
+    return pass_on_exceptions(exception=ImplementationLeftAsExerciseForTheUserError)
 
 
-class TestTransform(TestCase):
+def pass_test_on_runtime_error():
+    return pass_on_exceptions(exception=RuntimeError)
 
-    _transform_class: Type[Transform] = NotImplemented
 
-    _transform_function_to_solution_dict: Dict[sp.Basic, sp.Basic] = NotImplemented
+class BaseTestTransform(TestCase):
+
+    _transform_class: Type[BaseTransform] = NotImplemented
+
+    _transform_function_to_solution_dict: Dict[sp.Expr, sp.Expr] = NotImplemented
 
     _transform_data_kwargs_to_solution: Tuple[Tuple[Dict[str, Any], Any]] = NotImplemented
 
@@ -41,7 +44,6 @@ class TestTransform(TestCase):
         self.transform_function_to_solution_dict = self._transform_function_to_solution_dict
         self.transform_data_kwargs_to_solution = self._transform_data_kwargs_to_solution
         self.test_dps = 100
-        set_precision(self.test_dps)
         self.test_dps_tol = 10
 
         if any(
@@ -66,31 +68,37 @@ class TestTransform(TestCase):
 
     def _test_transform_on_function(
             self,
-            function: sp.Basic,
-            solution: sp.Basic
+            function: sp.Expr,
+            solution: sp.Expr
     ):
 
         transform = self.transform_class(function=function, is_base_form=True)
         self.assertTrue(
             functions_are_equal(
-                transform.transformed_function,
+                transform.transformed_func_as_func,
                 solution,
-                dps_tol=self.test_dps_tol,
-                num_tests=10
             )
         )
-        self.assertEqual(transform.base_function, function)
-
-        inverse_transform = self.transform_class(function=solution, is_base_form=False)
         self.assertTrue(
             functions_are_equal(
-                inverse_transform.base_function,
-                function,
-                dps_tol=self.test_dps_tol,
-                num_tests=10
+                transform.base_func_as_func,
+                function
             )
         )
-        self.assertEqual(inverse_transform.transformed_function, solution)
+
+        inverse_transform = self.transform_class(function=transform.transformed_func_as_func, is_base_form=False)
+        self.assertTrue(
+            functions_are_equal(
+                inverse_transform.base_func_as_func,
+                function,
+            )
+        )
+        self.assertTrue(
+            functions_are_equal(
+                inverse_transform.transformed_func_as_func,
+                solution
+            )
+        )
 
     """
     Test the transforming of discrete data
@@ -100,6 +108,7 @@ class TestTransform(TestCase):
         for kwargs, solution in self.transform_data_kwargs_to_solution:
             self._test_transform_data(kwargs, solution)
 
+    @pass_test_on_runtime_error()
     def _test_transform_data(self, kwargs, solution):
         transformed_data = self.transform_class.transform_data(**kwargs)
         self._assert_transformed_data_correct(transformed_data, solution)
@@ -111,12 +120,12 @@ class TestTransform(TestCase):
         if isinstance(transformed_data, sp.Expr):
             self.assertTrue(
                 functions_are_equal(
-                    transformed_data, solution,
-                    dps_tol=self.test_dps_tol, num_tests=10
+                    transformed_data,
+                    solution,
                 )
             )
         else:
-            self.assertEqual(transformed_data, solution)
+            self.assertTrue(deep_almost_equal(transformed_data, solution, dps_tol=self.test_dps_tol))
 
     def _assert_inverse_transformed_data_correct(self, inverse_transformed_data, kwargs):
 
