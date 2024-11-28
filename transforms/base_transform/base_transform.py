@@ -6,7 +6,7 @@ import sympy as sp
 from sympy.integrals.transforms import IntegralTransform
 
 from utils.sympy_math import (
-    replace_unevaled_integrals_with_forms, to_number, INF
+    replace_unevaled_integrals_with_forms, to_number
 )
 
 
@@ -88,13 +88,34 @@ class BaseTransform:
             {expr: replace_transform(expr) for expr in transform_res.atoms(IntegralTransform)}
         )
 
-        transform_res = transform_res.replace(sp.oo, INF)
-
         return transform_res
 
     @staticmethod
     def _extract_function(func_or_tuple: Tuple | sp.Expr) -> sp.Expr:
-        return func_or_tuple[0] if isinstance(func_or_tuple, tuple) else func_or_tuple
+        """
+        Processes the input to replace all `Piecewise` expressions with their first branch.
+
+        Parameters:
+        - func_or_tuple: A tuple containing a function or a SymPy expression.
+
+        Returns:
+        - A SymPy expression with all `Piecewise` expressions replaced by their first branch.
+        """
+        from sympy import Piecewise
+
+        # Extract the function if it's a tuple
+        func = func_or_tuple[0] if isinstance(func_or_tuple, tuple) else func_or_tuple
+
+        # Replace all Piecewise expressions with their first branch
+        def replace_piecewise(expr):
+            if isinstance(expr, Piecewise):
+                return expr.args[0].expr  # Return the expression of the first branch
+            elif expr.is_Atom:
+                return expr  # Base case: leave atomic elements unchanged
+            # Recurse through arguments
+            return expr.func(*[replace_piecewise(arg) for arg in expr.args])
+
+        return replace_piecewise(func)
 
     @property
     def base_func_as_func(self):

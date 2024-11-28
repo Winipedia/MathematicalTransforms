@@ -10,9 +10,6 @@ from utils.consts import ZERO
 from utils.util import apply_to_leaves
 
 
-INF = sp.Symbol("INF")
-
-
 def to_number(number: Any) -> sp.Number:
     if hasattr(number, 'has') and number.has(sp.pi):
         return number  # Keep symbolic if pi is present
@@ -146,7 +143,6 @@ def funcs_are_equal_number_test(expr1, expr2, num_tests=1, tolerance=1e-9, retry
     Returns:
     - True if the functions are equivalent within the test range, False otherwise.
     """
-    expr1, expr2 = expr1.subs(INF, sp.oo), expr2.subs(INF, sp.oo)
     # Dynamically find the symbols in the expressions
     symbols_set1 = expr1.free_symbols
     symbols_set2 = expr2.free_symbols
